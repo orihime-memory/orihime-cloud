@@ -48,28 +48,26 @@ def summarize_to_limit(text: str, limit_chars: int) -> str:
     return text[:limit_chars].rstrip() + "…"
 
 
-def wikipedia_search_top2(query: str):
-    """
-    日本語Wikipediaを優先して2件まで拾う
-    """
+def duckduckgo_search_top2(query: str):
     try:
-        search_url = f"https://ja.wikipedia.org/w/api.php?action=query&list=search&srsearch={quote(query)}&format=json"
-        with urlopen(search_url, timeout=10) as res:
+        url = f"https://api.duckduckgo.com/?q={quote(query)}&format=json&no_html=1&skip_disambig=1"
+        with urlopen(url, timeout=10) as res:
             data = json.loads(res.read().decode("utf-8"))
 
-        search_results = data.get("query", {}).get("search", [])
-        if not search_results:
-            return []
-
         results = []
-        for item in search_results[:2]:
-            title = item.get("title", "").strip()
-            snippet = item.get("snippet", "").replace("<span class=\\"searchmatch\\">", "").replace("</span>", "")
-            snippet = re.sub(r"<.*?>", "", snippet).strip()
 
-            text = f"{title}: {snippet}" if snippet else title
-            if text:
-                results.append(text)
+        abstract = (data.get("AbstractText") or "").strip()
+        if abstract:
+            results.append(abstract)
+
+        related = data.get("RelatedTopics") or []
+        for item in related:
+            if isinstance(item, dict) and item.get("Text"):
+                text = item["Text"].strip()
+                if text:
+                    results.append(text)
+            if len(results) >= 2:
+                break
 
         return results[:2]
     except Exception:
@@ -202,11 +200,7 @@ def run_search_comment(query: str):
     if not query:
         return None
 
-    # 長すぎる文は少し削る
-    query = query.replace("検索して", "").strip()
-    query = summarize_to_limit(query, 30)
-
-    results = wikipedia_search_top2(query)
+    results = duckduckgo_search_top2(query)
     if not results:
         return None
 
