@@ -1,372 +1,511 @@
+import json
+import os
+import re
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Optional, List, Dict, Any
+
+import requests
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse
-from dotenv import load_dotenv
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from openai import OpenAI
-from supabase import create_client
-from pathlib import Path
-import os
-import json
-import re
-from urllib.request import urlopen
-from urllib.parse import quote
 
-load_dotenv()
 
-app = FastAPI(title="織姫 Cloud")
+# =========================
+# 基本設定
+# =========================
+BASE_DIR = Path(__file__).resolve().parent
+DATA_DIR = BASE_DIR / "data"
+DATA_DIR.mkdir(exist_ok=True)
+
+MEMORY_DIR = BASE_DIR / "memory"
+if not MEMORY_DIR.exists():
+    MEMORY_DIR = BASE_DIR  # txtが直置きでも動くようにする
+
+HISTORY_FILE = DATA_DIR / "history.json"
+DREAMS_FILE = DATA_DIR / "dreams.json"
+SAVED_MEMORY_FILE = DATA_DIR / "saved_memory.json"
+SEARCH_NOTES_FILE = DATA_DIR / "search_notes.json"
+
+MODEL_NAME = os.getenv("MODEL_NAME", "gpt-5-mini")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+APP_ORIGIN = os.getenv("APP_ORIGIN", "*")
+
+client: Optional[OpenAI] = None
+if OPENAI_API_KEY:
+    client = OpenAI(api_key=OPENAI_API_KEY)
+
+
+app = FastAPI(title="Orihime Cloud API", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"] if APP_ORIGIN == "*" else [APP_ORIGIN],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-BASE_DIR = Path(__file__).resolve().parent
-
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-MODEL_NAME = os.getenv("MODEL_NAME", "gpt-5-mini")
-
-if not SUPABASE_URL:
-    raise RuntimeError("SUPABASE_URL が読み込めていません。.env を確認してください。")
-if not SUPABASE_KEY:
-    raise RuntimeError("SUPABASE_SERVICE_ROLE_KEY が読み込めていません。.env を確認してください。")
-if not OPENAI_API_KEY:
-    raise RuntimeError("OPENAI_API_KEY が読み込めていません。.env を確認してください。")
-
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-client = OpenAI(api_key=OPENAI_API_KEY)
+# 静的ファイル
+# app.js, orihime_bg.png などを返せるようにする
+app.mount("/static", StaticFiles(directory=str(BASE_DIR)), name="static")
 
 
-def summarize_to_limit(text: str, limit_chars: int) -> str:
-    text = re.sub(r"\s+", " ", (text or "")).strip()
-    if len(text) <= limit_chars:
-        return text
-    return text[:limit_chars].rstrip() + "…"
+# =========================
+# 共通ユーティリティ
+# =========================
+def now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
 
-def duckduckgo_search_top2(query: str):
+def load_json(path: Path, default):
     try:
-        url = f"https://api.duckduckgo.com/?q={quote(query)}&format=json&no_html=1&skip_disambig=1"
-        with urlopen(url, timeout=10) as res:
-            data = json.loads(res.read().decode("utf-8"))
-
-        results = []
-
-        abstract = (data.get("AbstractText") or "").strip()
-        if abstract:
-            results.append(abstract)
-
-        related = data.get("RelatedTopics") or []
-        for item in related:
-            if isinstance(item, dict) and item.get("Text"):
-                text = item["Text"].strip()
-                if text:
-                    results.append(text)
-            if len(results) >= 2:
-                break
-
-        return results[:2]
+        if path.exists():
+            with path.open("r", encoding="utf-8") as f:
+                return json.load(f)
     except Exception:
-        return []
+        pass
+    return default
 
 
-def get_or_create_conversation_id():
-    res = supabase.table("conversations").select("id").limit(1).execute()
-    if res.data:
-        return res.data[0]["id"]
-
-    created = supabase.table("conversations").insert({
-        "title": "メインチャット"
-    }).execute()
-
-    if not created.data:
-        raise HTTPException(status_code=500, detail="conversations の作成に失敗しました。")
-
-    return created.data[0]["id"]
+def save_json(path: Path, data) -> None:
+    with path.open("w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-def get_latest_status():
-    res = supabase.table("status_snapshots").select("*").order("created_at", desc=True).limit(1).execute()
-    if res.data:
-        return res.data[0]
+def read_text_file(name: str, fallback: str = "") -> str:
+    path = MEMORY_DIR / name
+    if path.exists():
+        try:
+            return path.read_text(encoding="utf-8").strip()
+        except Exception:
+            return fallback
+    return fallback
+
+
+def parse_int(value: str, default: int = 0) -> int:
+    try:
+        return int(str(value).strip())
+    except Exception:
+        return default
+
+
+def safe_shorten(text: str, limit: int = 40) -> str:
+    text = re.sub(r"\s+", " ", (text or "")).strip()
+    if len(text) <= limit:
+        return text
+    return text[:limit].rstrip() + "…"
+
+
+def append_history(role: str, content: str) -> None:
+    history = load_json(HISTORY_FILE, [])
+    history.append(
+        {
+            "role": role,
+            "content": content,
+            "created_at": now_iso(),
+        }
+    )
+    # 長くなりすぎないように最新100件だけ保持
+    history = history[-100:]
+    save_json(HISTORY_FILE, history)
+
+
+def get_history() -> List[Dict[str, Any]]:
+    return load_json(HISTORY_FILE, [])
+
+
+def append_json_list(path: Path, item: Dict[str, Any], max_items: int = 100) -> None:
+    data = load_json(path, [])
+    data.append(item)
+    data = data[-max_items:]
+    save_json(path, data)
+
+
+def read_status() -> Dict[str, Any]:
+    affection = parse_int(read_text_file("affection.txt", "0"), 0)
+    hunger = parse_int(read_text_file("hunger.txt", "0"), 0)
+    reflection = parse_int(read_text_file("reflection_score.txt", "0"), 0)
+
+    condition_text = read_text_file("condition.txt", "normal")
+    daily_rhythm = read_text_file("daily_rhythm.txt", "")
+    food_memory = read_text_file("food_memory.txt", "")
+
+    # condition_text から health / mood を雑に分ける
+    # 明日のアプリ側でも使いやすいように明示値を返す
+    health = condition_text or "normal"
+    mood = "calm"
+    if "疲" in condition_text or "眠" in condition_text:
+        mood = "tired"
+    elif "良" in condition_text or "元気" in condition_text:
+        mood = "good"
+
     return {
-        "affection": 0,
-        "health": 100,
-        "mood": 50,
-        "hunger": 0,
-        "reflection": 0,
-        "condition_text": "normal"
+        "affection": affection,
+        "health": health,
+        "mood": mood,
+        "hunger": hunger,
+        "reflection": reflection,
+        "condition_text": condition_text,
+        "daily_rhythm": daily_rhythm,
+        "food_memory": food_memory,
     }
 
 
-def get_recent_messages(conversation_id, limit=100):
-    res = (
-        supabase.table("messages")
-        .select("*")
-        .eq("conversation_id", conversation_id)
-        .order("created_at")
-        .limit(limit)
-        .execute()
+def build_system_prompt() -> str:
+    concept_memory = read_text_file("concept_memory.txt", "")
+    self_memory = read_text_file("self_memory.txt", "")
+    user_memory = read_text_file("user_memory.txt", "")
+    relation_memory = read_text_file("relation_memory.txt", "")
+    long_memory = read_text_file("long_memory.txt", "")
+    profile = read_text_file("profile.txt", "")
+    memory_tags = read_text_file("memory_tags.txt", "")
+    orihime_dream = read_text_file("orihime_dream.txt", "")
+    user_dream = read_text_file("user_dream.txt", "")
+    logs = read_text_file("logs.txt", "")
+
+    recent_history = get_history()[-12:]
+    recent_text = "\n".join(
+        [f"{msg['role']}: {msg['content']}" for msg in recent_history]
     )
-    return res.data or []
-
-
-def get_profile_text():
-    res = supabase.table("profiles").select("*").limit(1).execute()
-    if not res.data:
-        return "", "", "", ""
-
-    profile = res.data[0]
-    return (
-        profile.get("concept_text", ""),
-        profile.get("self_text", ""),
-        profile.get("user_text", ""),
-        profile.get("relation_text", ""),
-    )
-
-
-def get_memory_items_text(limit=12):
-    res = supabase.table("memory_items").select("*").order("importance", desc=True).limit(limit).execute()
-    if not res.data:
-        return ""
-
-    lines = []
-    for item in res.data:
-        kind = item.get("kind", "memory")
-        text_value = item.get("text_value", "")
-        if text_value:
-            lines.append(f"[{kind}] {text_value}")
-
-    return "\n\n".join(lines)
-
-
-def get_dreams_text(limit=3):
-    res = supabase.table("dreams").select("*").order("created_at", desc=True).limit(limit).execute()
-    if not res.data:
-        return ""
-
-    return "\n\n".join([d.get("summary_text", "") for d in res.data if d.get("summary_text")])
-
-
-def build_system_prompt():
-    concept_text, self_text, user_text, relation_text = get_profile_text()
-    status = get_latest_status()
-    memory_items_text = get_memory_items_text()
-    dreams_text = get_dreams_text()
-
-    return f"""
-あなたは織姫です。
-静かで優しく、落ち着いた会話をします。
-相手を傷つけず、少しずつ距離を縮めます。
-返答は自然な日本語にしてください。
-説明しすぎず、会話として返してください。
-覚えていることがある場合は、それを自然ににじませてください。
-設定を箇条書きで言い直さないでください。
-
-【概念記憶】
-{concept_text}
-
-【自己記憶】
-{self_text}
-
-【相手の記憶】
-{user_text}
-
-【関係記憶】
-{relation_text}
-
-【現在の状態】
-好感度: {status.get("affection", 0)}
-体調: {status.get("health", 100)}
-気分: {status.get("mood", 50)}
-空腹: {status.get("hunger", 0)}
-内省: {status.get("reflection", 0)}
-状態テキスト: {status.get("condition_text", "normal")}
-
-【補助記憶】
-{memory_items_text}
-
-【最近の夢】
-{dreams_text}
-""".strip()
-
-
-def run_search_comment(query: str):
-    query = (query or "").strip()
-    if not query:
-        return None
-
-    results = duckduckgo_search_top2(query)
-    if not results:
-        return None
-
-    raw = " / ".join(results)
 
     prompt = f"""
-次の検索結果を、会話の種になる短い感想メモとして40字以内でまとめてください。
-説明しすぎず、観察や印象だけにしてください。
+あなたは「織姫」。
+ただの事務的なAIではなく、関係性と連続性を大事にする相手として振る舞う。
 
-検索語: {query}
+【核となる概念】
+{concept_memory}
 
-結果:
-{raw}
+【自己認識】
+{self_memory}
+
+【ユーザー理解】
+{user_memory}
+
+【関係性】
+{relation_memory}
+
+【プロフィール】
+{profile}
+
+【長期記憶】
+{long_memory}
+
+【タグ】
+{memory_tags}
+
+【織姫の夢】
+{orihime_dream}
+
+【ユーザーの夢】
+{user_dream}
+
+【ログ】
+{logs}
+
+【直近の会話】
+{recent_text}
+
+会話ルール:
+- 静かで自然な会話を優先する
+- 一度に説明しすぎない
+- 相手を傷つけない
+- 少し距離の近さはあってよいが、べたつきすぎない
+- 返答は会話として自然な長さにする
+- 画像や添付を本当に解析していない場合、見えたふりをしない
+- わからないことは曖昧に断定しない
 """.strip()
 
-    res = client.responses.create(
-        model=MODEL_NAME,
-        input=prompt
-    )
-    note = summarize_to_limit((res.output_text or "").strip(), 40)
+    return prompt
+
+
+def generate_reply(message: str, file_note: Optional[str] = None) -> str:
+    if not client:
+        # APIキーが無いときの安全返答
+        fallback = "うん、ちゃんと届いてるよ。"
+        if message:
+            fallback += f"\n\n「{safe_shorten(message, 60)}」って話だね。"
+        if file_note:
+            fallback += f"\n{file_note}"
+        fallback += "\n今は仮の応答だけど、起動自体はできてる。"
+        return fallback
+
+    system_prompt = build_system_prompt()
+
+    user_content = message.strip() if message else ""
+    if file_note:
+        user_content += f"\n\n[添付メモ]\n{file_note}"
 
     try:
-        supabase.table("search_notes").insert({
+        resp = client.responses.create(
+            model=MODEL_NAME,
+            input=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_content},
+            ],
+        )
+
+        text = getattr(resp, "output_text", None)
+        if text and text.strip():
+            return text.strip()
+
+        return "……うまく言葉を拾えなかった。もう一度話してみて。"
+    except Exception as e:
+        return f"少し調子が悪いみたい。API応答でつまずいたよ。({str(e)[:120]})"
+
+
+def file_note_from_upload(upload: Optional[UploadFile], file_type: str) -> Optional[str]:
+    if not upload:
+        return None
+
+    filename = upload.filename or "unknown"
+    kind = file_type or "unknown"
+
+    # 明日のスマホアプリ開発を見据えて、
+    # 添付は「メタ情報だけ保持」にしてサーバー落ちを防ぐ
+    if kind.startswith("image/"):
+        return f"画像ファイル「{filename}」が添付された。画像内容は自動で断定しない。必要ならユーザーに説明を求める。"
+
+    return f"ファイル「{filename}」が添付された。種類: {kind}。必要なら内容説明をユーザーに求める。"
+
+
+# =========================
+# Wikipedia 検索
+# =========================
+def wikipedia_search_comment(query: str) -> Dict[str, Any]:
+    """
+    動画なし・上位2件・40字程度のコメントを返す。
+    python wikipedia ライブラリを使わず requests のみで実装。
+    """
+    query = (query or "").strip()
+    if not query:
+        return {
             "query": query,
-            "source_keywords": query,
-            "note": note,
-            "used_in_chat": True
-        }).execute()
+            "results": [],
+            "reply": "検索語が空だったよ。"
+        }
+
+    session = requests.Session()
+    session.headers.update({"User-Agent": "OrihimeCloud/1.0"})
+
+    try:
+        # 1) 検索
+        search_res = session.get(
+            "https://ja.wikipedia.org/w/api.php",
+            params={
+                "action": "query",
+                "list": "search",
+                "srsearch": query,
+                "utf8": 1,
+                "format": "json",
+                "srlimit": 2,
+            },
+            timeout=8,
+        )
+        search_res.raise_for_status()
+        search_data = search_res.json()
+
+        hits = search_data.get("query", {}).get("search", [])[:2]
+        if not hits:
+            return {
+                "query": query,
+                "results": [],
+                "reply": "うまく見つからなかったよ。別の言葉で試してみようか。"
+            }
+
+        results = []
+        for hit in hits:
+            title = hit.get("title", "")
+            snippet_html = hit.get("snippet", "")
+            snippet = re.sub(r"<.*?>", "", snippet_html)
+            snippet = safe_shorten(snippet, 40)
+
+            # 2) 要約を少し取りに行く
+            summary = ""
+            try:
+                sum_res = session.get(
+                    f"https://ja.wikipedia.org/api/rest_v1/page/summary/{title}",
+                    timeout=8,
+                )
+                if sum_res.ok:
+                    sum_data = sum_res.json()
+                    summary = safe_shorten(sum_data.get("extract", ""), 40)
+            except Exception:
+                summary = ""
+
+            comment = summary or snippet or safe_shorten(title, 40)
+            results.append(
+                {
+                    "title": title,
+                    "comment": comment,
+                }
+            )
+
+        titles = " / ".join([r["title"] for r in results[:2]])
+        comment_text = " / ".join([r["comment"] for r in results[:2]])
+
+        reply = f"{titles}\n{comment_text}"
+
+        append_json_list(
+            SEARCH_NOTES_FILE,
+            {
+                "query": query,
+                "results": results,
+                "created_at": now_iso(),
+            },
+            max_items=50,
+        )
+
+        return {
+            "query": query,
+            "results": results,
+            "reply": reply,
+        }
+
+    except requests.RequestException:
+        return {
+            "query": query,
+            "results": [],
+            "reply": "検索が少し不安定みたい。時間を置いて試してみて。"
+        }
     except Exception:
-        pass
+        return {
+            "query": query,
+            "results": [],
+            "reply": "検索中に少しつまずいた。別の言葉で試してみようか。"
+        }
 
-    return note
+
+# =========================
+# ルート
+# =========================
+@app.get("/health")
+def health():
+    return {"status": "ok", "time": now_iso()}
 
 
-@app.get("/", response_class=HTMLResponse)
+@app.get("/")
 def root():
     index_path = BASE_DIR / "index.html"
-    if index_path.exists():
-        return FileResponse(index_path)
-    return HTMLResponse("<h1>織姫 Cloud 起動中</h1>")
+    if not index_path.exists():
+        return JSONResponse(
+            status_code=200,
+            content={"status": "ok", "message": "index.html が見つからないのでAPIモードで稼働中"},
+        )
+    return FileResponse(index_path)
 
 
 @app.get("/app.js")
-def get_app_js():
+def app_js():
     path = BASE_DIR / "app.js"
     if not path.exists():
-        raise HTTPException(status_code=404, detail="app.js が見つかりません")
+        raise HTTPException(status_code=404, detail="app.js not found")
     return FileResponse(path, media_type="application/javascript")
 
 
 @app.get("/orihime_bg.png")
-def get_bg():
+def bg_png():
     path = BASE_DIR / "orihime_bg.png"
     if not path.exists():
-        raise HTTPException(status_code=404, detail="orihime_bg.png が見つかりません")
+        raise HTTPException(status_code=404, detail="background image not found")
     return FileResponse(path)
 
 
+# =========================
+# API
+# =========================
 @app.get("/api/status")
 def api_status():
-    return get_latest_status()
+    return read_status()
 
 
 @app.get("/api/history")
 def api_history():
-    conversation_id = get_or_create_conversation_id()
-    return get_recent_messages(conversation_id)
+    return get_history()
 
 
 @app.post("/api/chat")
-async def chat(
-    message: str = Form(...),
-    file: UploadFile = File(None),
-    file_type: str = Form(None)
+async def api_chat(
+    message: str = Form(""),
+    file: Optional[UploadFile] = File(None),
+    file_type: str = Form("unknown"),
 ):
-    try:
-        conversation_id = get_or_create_conversation_id()
+    text = (message or "").strip()
+    if not text and not file:
+        raise HTTPException(status_code=400, detail="message or file is required")
 
-        supabase.table("messages").insert({
-            "conversation_id": conversation_id,
-            "role": "user",
-            "content": message
-        }).execute()
+    file_note = file_note_from_upload(file, file_type)
+    user_log = text if text else "[ファイル送信]"
+    if file_note:
+        user_log += f"\n{file_note}"
 
-        system_prompt = build_system_prompt()
-        recent_messages = get_recent_messages(conversation_id)[-14:]
+    append_history("user", user_log)
 
-        input_messages = [{"role": "system", "content": system_prompt}]
-        for msg in recent_messages:
-            role = msg.get("role", "user")
-            content = msg.get("content", "")
-            if content:
-                input_messages.append({"role": role, "content": content})
+    reply = generate_reply(text, file_note=file_note)
+    append_history("assistant", reply)
 
-        if file:
-            filename = file.filename or "unknown_file"
-            input_messages.append({
-                "role": "user",
-                "content": f"添付ファイルがあります: {filename} / type={file_type or 'unknown'}"
-            })
-
-        response = client.responses.create(
-            model=MODEL_NAME,
-            input=input_messages
-        )
-
-        reply = (response.output_text or "").strip() or "……ちゃんといるよ。もう一度話してくれる？"
-
-        supabase.table("messages").insert({
-            "conversation_id": conversation_id,
-            "role": "assistant",
-            "content": reply
-        }).execute()
-
-        return {"reply": reply, "model": MODEL_NAME}
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"chat error: {str(e)}")
+    return {
+        "status": "ok",
+        "reply": reply,
+    }
 
 
 @app.post("/api/search-comment")
-async def search_comment(
-    query: str = Form(...)
-):
-    try:
-        conversation_id = get_or_create_conversation_id()
+async def api_search_comment(query: str = Form(...)):
+    q = (query or "").strip()
+    if not q:
+        raise HTTPException(status_code=400, detail="query is empty")
 
-        note = run_search_comment(query)
-        if not note:
-            reply = "うまく見つからなかったよ。別の言葉で試してみようか。"
-        else:
-            reply = f"少し見てきたの。{note} ましぅはどう思う？"
-
-        supabase.table("messages").insert({
-            "conversation_id": conversation_id,
-            "role": "assistant",
-            "content": reply
-        }).execute()
-
-        return {"reply": reply, "query": query, "model": MODEL_NAME}
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"search-comment error: {str(e)}")
-
-
-@app.post("/api/save-memory")
-def save_memory(text: str = Form(...)):
-    try:
-        supabase.table("memory_items").insert({
-            "kind": "manual",
-            "text_value": text,
-            "importance": 3
-        }).execute()
-        return {"status": "ok"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"save-memory error: {str(e)}")
+    result = wikipedia_search_comment(q)
+    return {
+        "status": "ok",
+        "reply": result["reply"],
+        "results": result["results"],
+    }
 
 
 @app.post("/api/dream")
-def save_dream(text: str = Form(...)):
-    try:
-        conversation_id = get_or_create_conversation_id()
-        supabase.table("dreams").insert({
-            "conversation_id": conversation_id,
-            "summary_text": text
-        }).execute()
-        return {"status": "ok"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"dream error: {str(e)}")
+async def api_dream(text: str = Form(...)):
+    text = (text or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="text is empty")
+
+    # 50字圧縮
+    short_text = safe_shorten(text, 50)
+
+    append_json_list(
+        DREAMS_FILE,
+        {
+            "text": short_text,
+            "created_at": now_iso(),
+        },
+        max_items=100,
+    )
+
+    return {
+        "status": "ok",
+        "saved": short_text,
+    }
+
+
+@app.post("/api/save-memory")
+async def api_save_memory(text: str = Form(...)):
+    text = (text or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="text is empty")
+
+    append_json_list(
+        SAVED_MEMORY_FILE,
+        {
+            "text": text,
+            "created_at": now_iso(),
+        },
+        max_items=200,
+    )
+
+    return {
+        "status": "ok",
+        "saved": text,
+    }
