@@ -1,114 +1,171 @@
 <!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>織姫 - Cloud</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>織姫 Cloud</title>
   <style>
-    :root{
-      --bg:#0f1220; --panel:#171a2b; --line:#2b3150; --text:#eef2ff; --muted:#aab3d1;
-      --accent:#8ea2ff; --user:#28406f; --assistant:#233a32; --danger:#ff7d7d;
+    * {
+      box-sizing: border-box;
     }
-    *{box-sizing:border-box}
-    body{margin:0;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}
-    .wrap{max-width:1100px;margin:0 auto;padding:16px;display:grid;grid-template-columns:320px 1fr;gap:16px;min-height:100vh}
-    .panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:16px}
-    h1,h2,h3,p{margin:0}
-    .title{font-size:24px;font-weight:700;margin-bottom:8px}
-    .sub{color:var(--muted);font-size:13px;margin-bottom:16px}
-    .status-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-    .stat{padding:12px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.02)}
-    .stat .label{font-size:12px;color:var(--muted);margin-bottom:4px}
-    .stat .value{font-size:22px;font-weight:700}
-    .memory-actions, .dream-actions{display:flex;flex-direction:column;gap:10px;margin-top:16px}
-    textarea, input[type="text"], input[type="file"]{width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);background:#0f1426;color:var(--text)}
-    button{border:none;border-radius:12px;padding:12px 14px;font-weight:700;background:var(--accent);color:#11162a;cursor:pointer}
-    button.secondary{background:#242b48;color:var(--text)}
-    button.danger{background:var(--danger);color:#2e1010}
-    .chat{display:flex;flex-direction:column;gap:12px;height:calc(100vh - 32px)}
-    .toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px}
-    .toolbar .api{font-size:12px;color:var(--muted);word-break:break-all}
-    .messages{flex:1;overflow:auto;border:1px solid var(--line);border-radius:18px;padding:14px;background:#0d1120}
-    .msg{max-width:78%;padding:12px 14px;border-radius:16px;margin:10px 0;white-space:pre-wrap;line-height:1.6}
-    .msg.user{margin-left:auto;background:var(--user)}
-    .msg.assistant{margin-right:auto;background:var(--assistant)}
-    .meta{font-size:11px;color:var(--muted);margin-top:6px}
-    .composer{display:grid;grid-template-columns:1fr;gap:10px}
-    .composer-row{display:flex;gap:10px}
-    .composer-row > *{flex:1}
-    .tiny{font-size:12px;color:var(--muted)}
-    .ok{color:#9ef0a8}
-    .err{color:#ff9d9d}
-    img.preview{max-width:220px;border-radius:12px;margin-top:8px;border:1px solid var(--line)}
-    @media (max-width: 860px){
-      .wrap{grid-template-columns:1fr}
-      .chat{height:auto}
-      .messages{min-height:50vh}
+
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      background: #0f1220 url('/orihime_bg.png') center center / cover no-repeat fixed;
+      color: #fff;
+    }
+
+    .overlay {
+      min-height: 100vh;
+      background: rgba(10, 12, 24, 0.72);
+      padding: 12px;
+    }
+
+    .container {
+      max-width: 860px;
+      margin: 0 auto;
+      background: rgba(20, 24, 40, 0.92);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px;
+      padding: 14px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font-size: 24px;
+    }
+
+    .status-box {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .status-item {
+      background: rgba(255,255,255,0.06);
+      border-radius: 10px;
+      padding: 8px;
+      font-size: 14px;
+    }
+
+    .chat-box {
+      height: 52vh;
+      overflow-y: auto;
+      background: rgba(0,0,0,0.25);
+      border-radius: 12px;
+      padding: 10px;
+      margin-bottom: 12px;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .msg {
+      max-width: 88%;
+      margin: 8px 0;
+      padding: 10px 12px;
+      border-radius: 12px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .user {
+      margin-left: auto;
+      background: #4f7fd6;
+      color: white;
+    }
+
+    .assistant {
+      margin-right: auto;
+      background: #6e8b62;
+      color: white;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 90px;
+      resize: vertical;
+      border-radius: 10px;
+      border: none;
+      padding: 10px;
+      font-size: 15px;
+      margin-bottom: 10px;
+    }
+
+    input[type="file"] {
+      width: 100%;
+      margin-bottom: 10px;
+      color: white;
+    }
+
+    .btn-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    button {
+      border: none;
+      border-radius: 10px;
+      padding: 10px 14px;
+      background: #6f8cff;
+      color: white;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    button.secondary {
+      background: #4d5a7f;
+    }
+
+    @media (max-width: 640px) {
+      h1 {
+        font-size: 20px;
+      }
+
+      .status-box {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .chat-box {
+        height: 48vh;
+      }
+
+      .msg {
+        max-width: 95%;
+        font-size: 14px;
+      }
+
+      button {
+        flex: 1 1 40%;
+      }
     }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <aside class="panel">
-      <div class="title">織姫 Cloud</div>
-      <div class="sub">FastAPI + Supabase 版フロント</div>
+  <div class="overlay">
+    <div class="container">
+      <h1>織姫 Cloud</h1>
 
-      <div class="sub">API URL</div>
-      <input id="apiBase" type="text" value="http://127.0.0.1:8000" />
+      <div id="status-box" class="status-box"></div>
 
-      <div style="height:16px"></div>
-      <h3>状態</h3>
-      <div class="status-grid" style="margin-top:10px">
-        <div class="stat"><div class="label">好感度</div><div class="value" id="affection">-</div></div>
-        <div class="stat"><div class="label">体調</div><div class="value" id="health">-</div></div>
-        <div class="stat"><div class="label">気分</div><div class="value" id="mood">-</div></div>
-        <div class="stat"><div class="label">空腹</div><div class="value" id="hunger">-</div></div>
-        <div class="stat"><div class="label">内省</div><div class="value" id="reflection">-</div></div>
-        <div class="stat"><div class="label">状態</div><div class="value" id="condition">-</div></div>
+      <div id="chat-box" class="chat-box"></div>
+
+      <textarea id="user-input" placeholder="織姫に話しかける"></textarea>
+
+      <input type="file" id="file-input">
+
+      <div class="btn-row">
+        <button id="send-btn">送信</button>
+        <button id="reload-history-btn" class="secondary">履歴更新</button>
+        <button id="dream-btn" class="secondary">夢保存</button>
+        <button id="save-memory-btn" class="secondary">記憶保存</button>
       </div>
-
-      <div class="memory-actions">
-        <h3>手動メモ</h3>
-        <textarea id="memoryText" rows="4" placeholder="覚えておきたい内容"></textarea>
-        <button id="saveMemoryBtn" class="secondary">メモ保存</button>
-      </div>
-
-      <div class="dream-actions">
-        <h3>夢 / 日記</h3>
-        <textarea id="dreamText" rows="4" placeholder="夢や一日の圧縮メモ"></textarea>
-        <button id="saveDreamBtn" class="secondary">夢を保存</button>
-      </div>
-
-      <div style="margin-top:16px" class="tiny">
-        画像は送信できる形にしてあるけど、バックエンド側で保存処理を足すと本番向きになる。
-      </div>
-      <div id="sideNotice" class="tiny" style="margin-top:10px"></div>
-    </aside>
-
-    <main class="panel chat">
-      <div class="toolbar">
-        <div>
-          <div class="title" style="font-size:20px">チャット</div>
-          <div class="api">接続先: <span id="apiLabel"></span></div>
-        </div>
-        <div>
-          <button id="reloadBtn" class="secondary">再読込</button>
-        </div>
-      </div>
-
-      <div id="messages" class="messages"></div>
-
-      <div class="composer">
-        <textarea id="messageInput" rows="4" placeholder="織姫に話しかける"></textarea>
-        <div class="composer-row">
-          <input id="fileInput" type="file" accept="image/*,.txt,.md,.pdf,.doc,.docx" />
-          <button id="sendBtn">送信</button>
-        </div>
-        <div id="previewBox" class="tiny"></div>
-      </div>
-    </main>
+    </div>
   </div>
 
-  <script src="./app.js"></script>
+  <script src="/app.js"></script>
 </body>
 </html>

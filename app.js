@@ -1,194 +1,149 @@
-const $ = (id) => document.getElementById(id);
+const API_BASE = "https://orihime-cloud.onrender.com";
 
-const state = {
-  model: null,
-  file: null,
-};
+const chatBox = document.getElementById("chat-box");
+const input = document.getElementById("user-input");
+const sendBtn = document.getElementById("send-btn");
+const fileInput = document.getElementById("file-input");
+const statusBox = document.getElementById("status-box");
+const historyBtn = document.getElementById("reload-history-btn");
+const dreamBtn = document.getElementById("dream-btn");
+const saveMemoryBtn = document.getElementById("save-memory-btn");
 
-function getApiBase() {
-  return $("apiBase").value.trim().replace(/\/$/, "");
-}
-
-function setNotice(text, isError = false) {
-  const el = $("sideNotice");
-  el.textContent = text || "";
-  el.className = "tiny " + (isError ? "err" : "ok");
-}
-
-function escapeHtml(str) {
-  return (str || "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;");
-}
-
-function renderMessage(role, content, meta = "") {
-  const box = $("messages");
+function addMessage(role, text) {
   const div = document.createElement("div");
-  div.className = `msg ${role === "user" ? "user" : "assistant"}`;
-  div.innerHTML = `<div>${escapeHtml(content)}</div>${meta ? `<div class="meta">${escapeHtml(meta)}</div>` : ""}`;
-  box.appendChild(div);
-  box.scrollTop = box.scrollHeight;
-}
-
-function clearMessages() {
-  $("messages").innerHTML = "";
+  div.className = role === "user" ? "msg user" : "msg assistant";
+  div.textContent = text;
+  chatBox.appendChild(div);
+  chatBox.scrollTop = chatBox.scrollHeight;
 }
 
 async function loadStatus() {
-  const base = getApiBase();
-  $("apiLabel").textContent = base;
+  try {
+    const res = await fetch(`${API_BASE}/api/status`);
+    const data = await res.json();
 
-  const res = await fetch(`${base}/api/status`);
-  if (!res.ok) throw new Error("status の取得に失敗");
-  const data = await res.json();
-
-  $("affection").textContent = data.affection ?? "-";
-  $("health").textContent = data.health ?? "-";
-  $("mood").textContent = data.mood ?? "-";
-  $("hunger").textContent = data.hunger ?? "-";
-  $("reflection").textContent = data.reflection ?? "-";
-  $("condition").textContent = data.condition_text ?? "-";
+    statusBox.innerHTML = `
+      <div class="status-item">好感度: ${data.affection ?? "-"}</div>
+      <div class="status-item">体調: ${data.health ?? "-"}</div>
+      <div class="status-item">気分: ${data.mood ?? "-"}</div>
+      <div class="status-item">空腹: ${data.hunger ?? "-"}</div>
+      <div class="status-item">内省: ${data.reflection ?? "-"}</div>
+      <div class="status-item">状態: ${data.condition_text ?? "-"}</div>
+    `;
+  } catch (e) {
+    console.error("status error", e);
+  }
 }
 
 async function loadHistory() {
-  const base = getApiBase();
-  const res = await fetch(`${base}/api/history`);
-  if (!res.ok) throw new Error("history の取得に失敗");
-  const data = await res.json();
+  try {
+    const res = await fetch(`${API_BASE}/api/history`);
+    const data = await res.json();
 
-  clearMessages();
-  for (const msg of data) {
-    const role = msg.role === "user" ? "user" : "assistant";
-    renderMessage(role, msg.content || "");
+    chatBox.innerHTML = "";
+
+    for (const msg of data) {
+      if (msg.role === "user") {
+        addMessage("user", msg.content || "");
+      } else if (msg.role === "assistant") {
+        addMessage("assistant", msg.content || "");
+      }
+    }
+  } catch (e) {
+    console.error("history error", e);
   }
 }
 
 async function sendMessage() {
-  const base = getApiBase();
-  const text = $("messageInput").value.trim();
-  if (!text) return;
+  const message = input.value.trim();
+  const file = fileInput.files[0];
 
-  const file = $("fileInput").files[0] || null;
-  state.file = file;
+  if (!message && !file) return;
 
-  renderMessage("user", text, file ? `添付: ${file.name}` : "");
-  $("messageInput").value = "";
+  if (message) addMessage("user", message);
+  input.value = "";
 
   const formData = new FormData();
-  formData.append("message", text);
+  formData.append("message", message || "");
 
   if (file) {
     formData.append("file", file);
     formData.append("file_type", file.type || "unknown");
   }
 
-  const res = await fetch(`${base}/api/chat`, {
-    method: "POST",
-    body: formData,
-  });
+  try {
+    const res = await fetch(`${API_BASE}/api/chat`, {
+      method: "POST",
+      body: formData
+    });
 
-  if (!res.ok) {
-    let errText = "送信に失敗";
-    try {
-      const err = await res.json();
-      errText = err.detail || JSON.stringify(err);
-    } catch {
-      errText = await res.text();
+    const data = await res.json();
+
+    if (!res.ok) {
+      addMessage("assistant", "エラー: " + (data.detail || "送信失敗"));
+      return;
     }
-    renderMessage("assistant", `エラー: ${errText}`);
-    return;
+
+    addMessage("assistant", data.reply || "返事が空でした");
+    fileInput.value = "";
+    await loadStatus();
+  } catch (e) {
+    addMessage("assistant", "通信エラー: " + e.message);
   }
-
-  const data = await res.json();
-  state.model = data.model || null;
-  renderMessage("assistant", data.reply || "", state.model ? `model: ${state.model}` : "");
-  await loadStatus().catch(() => {});
-}
-
-async function saveMemory() {
-  const base = getApiBase();
-  const text = $("memoryText").value.trim();
-  if (!text) return;
-
-  const fd = new FormData();
-  fd.append("text", text);
-
-  const res = await fetch(`${base}/api/save-memory`, { method: "POST", body: fd });
-  if (!res.ok) throw new Error("メモ保存に失敗");
-  $("memoryText").value = "";
-  setNotice("メモを保存したよ。");
 }
 
 async function saveDream() {
-  const base = getApiBase();
-  const text = $("dreamText").value.trim();
+  const text = prompt("夢として保存する文章を入れて");
   if (!text) return;
 
-  const fd = new FormData();
-  fd.append("text", text);
+  const formData = new FormData();
+  formData.append("text", text);
 
-  const res = await fetch(`${base}/api/dream`, { method: "POST", body: fd });
-  if (!res.ok) throw new Error("夢保存に失敗");
-  $("dreamText").value = "";
-  setNotice("夢を保存したよ。");
-}
-
-function bindPreview() {
-  $("fileInput").addEventListener("change", () => {
-    const file = $("fileInput").files[0];
-    const box = $("previewBox");
-    box.innerHTML = "";
-
-    if (!file) return;
-
-    const info = document.createElement("div");
-    info.textContent = `選択中: ${file.name} (${file.type || "unknown"})`;
-    box.appendChild(info);
-
-    if (file.type && file.type.startsWith("image/")) {
-      const img = document.createElement("img");
-      img.className = "preview";
-      img.src = URL.createObjectURL(file);
-      box.appendChild(img);
-    }
-  });
-}
-
-async function boot() {
   try {
-    await loadStatus();
-    await loadHistory();
-    setNotice("接続できたよ。");
+    const res = await fetch(`${API_BASE}/api/dream`, {
+      method: "POST",
+      body: formData
+    });
+
+    const data = await res.json();
+    alert(data.status === "ok" ? "夢を保存したよ" : "保存失敗");
   } catch (e) {
-    setNotice(`起動時エラー: ${e.message}`, true);
+    alert("夢保存エラー: " + e.message);
   }
 }
 
-$("sendBtn").addEventListener("click", () => {
-  sendMessage().catch((e) => {
-    setNotice(e.message, true);
-  });
-});
+async function saveMemory() {
+  const text = prompt("覚えさせたい内容を入れて");
+  if (!text) return;
 
-$("reloadBtn").addEventListener("click", () => {
-  boot();
-});
+  const formData = new FormData();
+  formData.append("text", text);
 
-$("saveMemoryBtn").addEventListener("click", () => {
-  saveMemory().catch((e) => setNotice(e.message, true));
-});
+  try {
+    const res = await fetch(`${API_BASE}/api/save-memory`, {
+      method: "POST",
+      body: formData
+    });
 
-$("saveDreamBtn").addEventListener("click", () => {
-  saveDream().catch((e) => setNotice(e.message, true));
-});
+    const data = await res.json();
+    alert(data.status === "ok" ? "記憶を保存したよ" : "保存失敗");
+  } catch (e) {
+    alert("記憶保存エラー: " + e.message);
+  }
+}
 
-$("messageInput").addEventListener("keydown", (e) => {
+sendBtn.addEventListener("click", sendMessage);
+
+input.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) {
     e.preventDefault();
-    sendMessage().catch((err) => setNotice(err.message, true));
+    sendMessage();
   }
 });
 
-bindPreview();
-boot();
+historyBtn.addEventListener("click", loadHistory);
+dreamBtn.addEventListener("click", saveDream);
+saveMemoryBtn.addEventListener("click", saveMemory);
+
+loadHistory();
+loadStatus();
