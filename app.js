@@ -3,6 +3,7 @@ const API_BASE = "https://orihime-cloud.onrender.com";
 const chatBox = document.getElementById("chat-box");
 const input = document.getElementById("user-input");
 const sendBtn = document.getElementById("send-btn");
+const searchBtn = document.getElementById("search-btn");
 const fileInput = document.getElementById("file-input");
 const statusBox = document.getElementById("status-box");
 const historyBtn = document.getElementById("reload-history-btn");
@@ -92,6 +93,35 @@ async function sendMessage() {
   }
 }
 
+async function searchComment() {
+  const query = input.value.trim();
+  if (!query) return;
+
+  addMessage("user", `検索: ${query}`);
+  input.value = "";
+
+  const formData = new FormData();
+  formData.append("query", query);
+
+  try {
+    const res = await fetch(`${API_BASE}/api/search-comment`, {
+      method: "POST",
+      body: formData
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      addMessage("assistant", "検索エラー: " + (data.detail || "検索失敗"));
+      return;
+    }
+
+    addMessage("assistant", data.reply || "検索結果が空でした");
+  } catch (e) {
+    addMessage("assistant", "検索通信エラー: " + e.message);
+  }
+}
+
 async function saveDream() {
   const text = prompt("夢として保存する文章を入れて");
   if (!text) return;
@@ -133,6 +163,7 @@ async function saveMemory() {
 }
 
 sendBtn.addEventListener("click", sendMessage);
+searchBtn.addEventListener("click", searchComment);
 
 input.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) {

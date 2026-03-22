@@ -5,9 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>織姫 Cloud</title>
   <style>
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     body {
       margin: 0;
@@ -18,18 +16,19 @@
 
     .overlay {
       min-height: 100vh;
-      background: rgba(10, 12, 24, 0.72);
+      background: rgba(10, 12, 24, 0.45);
       padding: 12px;
     }
 
     .container {
       max-width: 860px;
       margin: 0 auto;
-      background: rgba(20, 24, 40, 0.92);
+      background: rgba(20, 24, 40, 0.72);
       border: 1px solid rgba(255,255,255,0.08);
       border-radius: 16px;
       padding: 14px;
       box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+      backdrop-filter: blur(6px);
     }
 
     h1 {
@@ -45,7 +44,7 @@
     }
 
     .status-item {
-      background: rgba(255,255,255,0.06);
+      background: rgba(255,255,255,0.10);
       border-radius: 10px;
       padding: 8px;
       font-size: 14px;
@@ -54,7 +53,7 @@
     .chat-box {
       height: 52vh;
       overflow-y: auto;
-      background: rgba(0,0,0,0.25);
+      background: rgba(0,0,0,0.18);
       border-radius: 12px;
       padding: 10px;
       margin-bottom: 12px;
@@ -73,13 +72,13 @@
 
     .user {
       margin-left: auto;
-      background: #4f7fd6;
+      background: rgba(79, 127, 214, 0.92);
       color: white;
     }
 
     .assistant {
       margin-right: auto;
-      background: #6e8b62;
+      background: rgba(110, 139, 98, 0.92);
       color: white;
     }
 
@@ -120,27 +119,16 @@
       background: #4d5a7f;
     }
 
+    button.search {
+      background: #8b6bff;
+    }
+
     @media (max-width: 640px) {
-      h1 {
-        font-size: 20px;
-      }
-
-      .status-box {
-        grid-template-columns: 1fr 1fr;
-      }
-
-      .chat-box {
-        height: 48vh;
-      }
-
-      .msg {
-        max-width: 95%;
-        font-size: 14px;
-      }
-
-      button {
-        flex: 1 1 40%;
-      }
+      h1 { font-size: 20px; }
+      .status-box { grid-template-columns: 1fr 1fr; }
+      .chat-box { height: 48vh; }
+      .msg { max-width: 95%; font-size: 14px; }
+      button { flex: 1 1 40%; }
     }
   </style>
 </head>
@@ -153,12 +141,13 @@
 
       <div id="chat-box" class="chat-box"></div>
 
-      <textarea id="user-input" placeholder="織姫に話しかける"></textarea>
+      <textarea id="user-input" placeholder="織姫に話しかける / 検索したい言葉を書く"></textarea>
 
       <input type="file" id="file-input">
 
       <div class="btn-row">
         <button id="send-btn">送信</button>
+        <button id="search-btn" class="search">検索＋コメント</button>
         <button id="reload-history-btn" class="secondary">履歴更新</button>
         <button id="dream-btn" class="secondary">夢保存</button>
         <button id="save-memory-btn" class="secondary">記憶保存</button>
