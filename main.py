@@ -80,12 +80,12 @@ def safe_table_select(table: str, order_desc: bool = False, limit: Optional[int]
 
 @app.get("/")
 def root():
-    return FileResponse(BASE_DIR / "index_fixed.html")
+    return FileResponse(BASE_DIR / "index.html")
 
 
 @app.get("/app.js")
 def app_js():
-    return FileResponse(BASE_DIR / "app_fixed.js", media_type="application/javascript")
+    return FileResponse(BASE_DIR / "app.js", media_type="application/javascript")
 
 
 @app.get("/api/status")
