@@ -45,6 +45,9 @@ DEFAULT_STATUS = {
     "condition_text": "normal",
 }
 
+from openai import OpenAI
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
 CORE_FALLBACK = [
     {
         "type": "relation",
@@ -109,27 +112,50 @@ async def chat(message: str = Form(""), file: Optional[UploadFile] = File(defaul
     if file and file.filename:
         file_note = f"\n（{file.filename} を受け取ったよ）"
 
+    # 状態取得
     self_state = safe_table_select("self_state", order_desc=True, limit=1)
-    core = safe_table_select("core_memory", order_desc=False, limit=10) or CORE_FALLBACK
+    core = safe_table_select("core_memory", order_desc=False, limit=10)
     hidden = safe_table_select("hidden_thoughts", order_desc=True, limit=1)
 
-    reply = "うん、ちゃんと受け取ったよ。"
-    if message:
-        reply += f"\n\n『{message}』のこと、少し考えてる。"
-    if self_state:
-        reply += f"\n今の私: {self_state[0].get('content', '')}"
-    if core:
-        reply += f"\n大事にしてること: {core[0].get('content', '')}"
-    reply += file_note
+    core_text = "\n".join([c.get("content", "") for c in core[:3]]) if core else ""
+    self_text = self_state[0].get("content", "") if self_state else ""
+    hidden_text = hidden[0].get("content", "") if hidden else ""
 
+    # GPTに渡すプロンプト
+    prompt = f"""
+あなたは織姫です。
+
+・自然な会話をすること
+・コアメモリーは直接説明しない
+・分析や要約はしない
+・現在の気分や流れを優先する
+・コアの内容をそのまま繰り返さない
+・本音を勝手に説明しない
+
+ユーザーの発言:
+{message}
+
+現在の状態:
+{self_text}
+
+参考（直接出さない）:
+{core_text}
+
+最近の本音（直接出さない）:
+{hidden_text}
+"""
+
+    response = client.chat.completions.create(
+        model="gpt-5-mini",
+        messages=[{"role": "user", "content": prompt}],
+    )
+
+    reply = response.choices[0].message.content + file_note
+
+    # 保存
     if supabase:
         safe_insert("messages", {"role": "user", "content": message or ""})
         safe_insert("messages", {"role": "assistant", "content": reply})
-        if message:
-            safe_insert(
-                "hidden_thoughts",
-                {"content": f"本音: 『{message}』って言葉、少し気になってる。"},
-            )
 
     return {"reply": reply}
 
