@@ -4,3 +4,5 @@ python-multipart
 openai
 requests
 python-dotenv
+Flask
+gunicorn
