@@ -78,27 +78,6 @@ def safe_table_select(table: str, order_desc: bool = False, limit: Optional[int]
     except Exception:
         return []
 
-
-def safe_insert(table: str, payload: dict):
-    if not supabase:
-        return None
-    try:
-        return supabase.table(table).insert(payload).execute()
-    except Exception:
-        return None
-
-
-def safe_replace_self_state(content: str):
-    if not supabase:
-        return False
-    try:
-        supabase.table("self_state").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
-        supabase.table("self_state").insert({"content": content}).execute()
-        return True
-    except Exception:
-        return False
-
-
 @app.get("/")
 def root():
     return FileResponse(BASE_DIR / "index_fixed.html")
@@ -239,6 +218,32 @@ def save_memory(text: str = Form(...)):
     safe_insert("memory_items", {"content": text})
     return {"status": "ok"}
 
+
+def safe_insert(table: str, payload: dict):
+    if not supabase:
+        return None
+    try:
+        return supabase.table(table).insert(payload).execute()
+    except Exception:
+        return None
+
+
+def safe_replace_self_state(content: str):
+    if not supabase:
+        return False
+    try:
+        supabase.table("self_state").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
+        supabase.table("self_state").insert({"content": content}).execute()
+        return True
+    except Exception:
+        return False
+
+@app.post("/api/daily")
+def daily_update():
+    hidden = "なんとなく静かな日だった気がする"
+    safe_insert("hidden_thoughts", {"content": hidden})
+    safe_replace_self_state("少し落ち着いている")
+    return {"ok": True}
 
 @app.exception_handler(Exception)
 async def all_exception_handler(request, exc):
