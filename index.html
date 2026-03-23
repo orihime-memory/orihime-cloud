@@ -6,20 +6,17 @@
   <title>織姫 Cloud</title>
   <style>
     * { box-sizing: border-box; }
-
     body {
       margin: 0;
       font-family: sans-serif;
       background: #0f1220 url('/orihime_bg.png') center center / cover no-repeat fixed;
       color: #fff;
     }
-
     .overlay {
       min-height: 100vh;
       background: rgba(10, 12, 24, 0.45);
       padding: 12px;
     }
-
     .container {
       max-width: 860px;
       margin: 0 auto;
@@ -30,26 +27,43 @@
       box-shadow: 0 8px 24px rgba(0,0,0,0.35);
       backdrop-filter: blur(6px);
     }
-
-    h1 {
-      margin: 0 0 12px;
-      font-size: 24px;
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
     }
-
+    h1 { margin: 0; font-size: 24px; }
+    .icon-btn, .plus-btn, button {
+      border: none;
+      border-radius: 10px;
+      padding: 10px 14px;
+      background: #6f8cff;
+      color: white;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .icon-btn, .plus-btn {
+      width: 40px;
+      height: 40px;
+      padding: 0;
+      font-size: 18px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
     .status-box {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
       gap: 8px;
       margin-bottom: 14px;
     }
-
     .status-item {
       background: rgba(255,255,255,0.10);
       border-radius: 10px;
       padding: 8px;
       font-size: 14px;
     }
-
     .chat-box {
       height: 52vh;
       overflow-y: auto;
@@ -59,7 +73,6 @@
       margin-bottom: 12px;
       border: 1px solid rgba(255,255,255,0.08);
     }
-
     .msg {
       max-width: 88%;
       margin: 8px 0;
@@ -69,19 +82,20 @@
       white-space: pre-wrap;
       word-break: break-word;
     }
-
     .user {
       margin-left: auto;
       background: rgba(79, 127, 214, 0.92);
-      color: white;
     }
-
     .assistant {
       margin-right: auto;
       background: rgba(110, 139, 98, 0.92);
-      color: white;
     }
-
+    .composer {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: end;
+    }
     textarea {
       width: 100%;
       min-height: 90px;
@@ -90,68 +104,98 @@
       border: none;
       padding: 10px;
       font-size: 15px;
-      margin-bottom: 10px;
     }
-
-    input[type="file"] {
-      width: 100%;
-      margin-bottom: 10px;
-      color: white;
-    }
-
-    .btn-row {
+    .right-tools {
       display: flex;
-      flex-wrap: wrap;
+      flex-direction: column;
+      gap: 8px;
+      align-items: center;
+    }
+    .mini-note {
+      margin-top: 12px;
+      font-size: 12px;
+      opacity: 0.85;
+    }
+    .menu-panel, .modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      z-index: 20;
+    }
+    .menu-card, .modal-card {
+      width: min(92vw, 520px);
+      margin: 10vh auto 0;
+      background: rgba(20, 24, 40, 0.96);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px;
+      padding: 16px;
+    }
+    .menu-list {
+      display: grid;
       gap: 8px;
     }
-
-    button {
-      border: none;
-      border-radius: 10px;
-      padding: 10px 14px;
-      background: #6f8cff;
-      color: white;
-      font-size: 14px;
-      cursor: pointer;
+    .menu-list button { width: 100%; text-align: left; }
+    .secondary { background: #4d5a7f; }
+    .close-row { display: flex; justify-content: flex-end; margin-top: 10px; }
+    pre.output {
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: rgba(255,255,255,0.06);
+      border-radius: 12px;
+      padding: 12px;
+      min-height: 120px;
     }
-
-    button.secondary {
-      background: #4d5a7f;
-    }
-
-    button.search {
-      background: #8b6bff;
-    }
-
+    input[type="file"] { display: none; }
     @media (max-width: 640px) {
       h1 { font-size: 20px; }
-      .status-box { grid-template-columns: 1fr 1fr; }
       .chat-box { height: 48vh; }
       .msg { max-width: 95%; font-size: 14px; }
-      button { flex: 1 1 40%; }
     }
   </style>
 </head>
 <body>
   <div class="overlay">
     <div class="container">
-      <h1>織姫 Cloud</h1>
+      <div class="topbar">
+        <h1>織姫 Cloud</h1>
+        <button class="plus-btn" id="plus-btn">＋</button>
+      </div>
 
       <div id="status-box" class="status-box"></div>
-
       <div id="chat-box" class="chat-box"></div>
 
-      <textarea id="user-input" placeholder="織姫に話しかける / 検索したい言葉を書く"></textarea>
-
+      <div class="composer">
+        <textarea id="user-input" placeholder="織姫に話しかける"></textarea>
+        <div class="right-tools">
+          <button class="icon-btn" id="camera-btn" title="ファイル選択">📷</button>
+          <button id="send-btn">送信</button>
+        </div>
+      </div>
       <input type="file" id="file-input">
 
-      <div class="btn-row">
-        <button id="send-btn">送信</button>
-        <button id="search-btn" class="search">検索＋コメント</button>
-        <button id="reload-history-btn" class="secondary">履歴更新</button>
-        <button id="dream-btn" class="secondary">夢保存</button>
-        <button id="save-memory-btn" class="secondary">記憶保存</button>
+      <div class="mini-note">検索機能は外して、織姫の内側に寄せた構成にしてあるよ。</div>
+    </div>
+  </div>
+
+  <div class="menu-panel" id="menu-panel">
+    <div class="menu-card">
+      <div class="menu-list">
+        <button onclick="triggerFilePick()">ファイル選択</button>
+        <button onclick="openDictionary()">辞書</button>
+        <button onclick="openFeeling()">気持ち</button>
+        <button onclick="openHidden()">本音</button>
+        <button onclick="openWriting()">執筆</button>
       </div>
+      <div class="close-row"><button class="secondary" onclick="closeMenu()">閉じる</button></div>
+    </div>
+  </div>
+
+  <div class="modal" id="modal">
+    <div class="modal-card">
+      <h3 id="modal-title">表示</h3>
+      <pre id="modal-output" class="output"></pre>
+      <div class="close-row"><button class="secondary" onclick="closeModal()">閉じる</button></div>
     </div>
   </div>
 
