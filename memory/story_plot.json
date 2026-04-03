@@ -1,0 +1,18 @@
+{
+  "title": "作品のタイトルを書く",
+  "genre": "ジャンルを書く（例：現代ファンタジー、SF、恋愛）",
+  "theme": "この作品で一番伝えたいことを書く",
+  "ending_aftertaste": "読後に残したい余韻を書く",
+  "reading_tone": "文章の読み口を書く（例：静か、一人称、会話多め）",
+  "timeline": "どれくらいの期間の話かを書く",
+  "seasonal_events": "季節イベントを書く（例：バレンタイン、夏祭り、卒業式）",
+  "characters": "登場人物を書く\n例：\n・主人公：\n・相手役：",
+  "locations": "舞台を書く\n例：\n・高校\n・病院\n・自宅",
+  "detailed_plot": "物語の流れをざっくり書く",
+  "story_layer": "何が起きるか（事実ベース）",
+  "emotion_layer": "感情の流れ",
+  "daily_layer": "日常シーン",
+  "scratchpad": "思いついたことメモ",
+  "next_step": "次に書く内容",
+  "pending_points": "後半に響きそうな要素・気になった点"
+}

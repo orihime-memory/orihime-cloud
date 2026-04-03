@@ -1,219 +1,263 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>織姫 Cloud</title>
+  <title>織姫</title>
   <style>
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
-      background: #0f1220 url('/static/orihime_bg.png') center center / cover no-repeat fixed;
-      color: #fff;
-      min-height: 100vh;
+    :root{
+      --panel: rgba(10,14,28,0.58);
+      --line: rgba(255,255,255,0.10);
+      --text: #f7f8ff;
+      --muted: rgba(255,255,255,0.72);
+      --accent: #7b88ff;
+      --ok: #5fe38f;
+      --bg1: #09101d;
+      --bg2: #10182a;
+      --bg3: #171d2c;
     }
-    .overlay {
-      min-height: 100vh;
-      background: rgba(8, 12, 24, 0.32);
-      padding: 16px;
+    *{ box-sizing:border-box; }
+    html,body{
+      margin:0; width:100%; height:100%; overflow:hidden;
+      background:#0b1020; color:var(--text);
+      font-family:-apple-system,BlinkMacSystemFont,"Yu Gothic","Hiragino Sans",sans-serif;
     }
-    .container {
-      max-width: 880px;
-      margin: 0 auto;
-      min-height: calc(100vh - 32px);
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
+    body{
+      background:
+        radial-gradient(circle at 50% 10%, rgba(122,142,255,0.16), transparent 28%),
+        linear-gradient(180deg, var(--bg1) 0%, var(--bg2) 45%, var(--bg3) 100%);
     }
-    .topbar {
-      display:flex; align-items:center; justify-content:space-between;
-      padding: 8px 0 0;
+    .overlay{
+      position:fixed; inset:0; display:grid;
+      grid-template-rows:auto 1fr auto; padding:18px; pointer-events:none;
     }
-    h1 { margin: 0; font-size: 26px; font-weight: 700; }
-    .icon-row { display:flex; gap:12px; align-items:center; }
-    .icon-btn {
-      width: 54px; height: 54px; border-radius: 50%;
-      border: none; cursor: pointer;
-      background: rgba(20,24,40,0.72);
-      color: #fff; font-size: 28px;
-      backdrop-filter: blur(8px);
-      box-shadow: 0 6px 18px rgba(0,0,0,0.18);
+    .topbar{
+      display:flex; justify-content:flex-end; align-items:flex-start; gap:12px;
     }
-    .status-card, .chat-card, .input-card {
-      border-radius: 24px;
-      background: rgba(20,24,40,0.42);
-      border: 1px solid rgba(255,255,255,0.10);
-      backdrop-filter: blur(10px);
+    .status-card, .message-card, .composer, .modal, .menu{
+      background:var(--panel);
+      border:1px solid var(--line);
+      backdrop-filter: blur(14px);
+      box-shadow:0 10px 30px rgba(0,0,0,0.22);
     }
-    .status-card { padding: 14px; }
-    .status-box {
-      display:grid; grid-template-columns:repeat(2,1fr); gap:12px;
+    .status-card{
+      pointer-events:auto; border-radius:18px; padding:10px 12px; min-width:240px;
     }
-    .status-item {
-      background: rgba(255,255,255,0.10);
-      border-radius: 18px;
-      padding: 16px;
-      font-size: 17px;
-      min-height: 70px;
-      display:flex; align-items:center;
+    .status-line{ display:flex; justify-content:space-between; gap:10px; align-items:center; }
+    .status-label{ font-size:12px; color:var(--muted); }
+    .status-value{ font-size:13px; }
+    .main{
+      position:relative; display:flex; align-items:center; justify-content:center; min-height:0;
     }
-    .chat-card {
-      flex: 1 1 auto;
-      overflow: hidden;
-      min-height: 220px;
-      display:flex;
+    .portrait-wrap{
+      position:absolute; inset:0; display:flex; align-items:flex-end; justify-content:center;
+      pointer-events:none; padding:8px 18px 88px;
     }
-    .chat-box {
-      width:100%;
-      overflow-y:auto;
-      padding: 16px;
+    .portrait{
+      width:auto; height:auto;
+      max-width:min(88vw, 760px);
+      max-height:min(82vh, 1120px);
+      object-fit:contain;
+      object-position:center top;
+      filter: drop-shadow(0 18px 48px rgba(0,0,0,0.35));
+      user-select:none; -webkit-user-drag:none;
+      transform: translateY(42px);
     }
-    .msg {
-      max-width: 88%;
-      margin: 10px 0;
-      padding: 14px 16px;
-      border-radius: 18px;
-      line-height: 1.7;
-      white-space: pre-wrap;
-      word-break: break-word;
-      font-size: 18px;
+    .message-wrap{
+      position:absolute; left:50%; bottom:116px; transform:translateX(-50%);
+      width:min(92vw, 720px); display:flex; justify-content:center; pointer-events:none;
+      z-index:2;
     }
-    .user { margin-left:auto; background: rgba(91,113,214,0.92); }
-    .assistant { margin-right:auto; background: rgba(20,24,40,0.78); }
-    .input-card { padding: 14px; position: sticky; bottom: 8px; }
-    .input-row { display:flex; gap:12px; align-items:flex-end; }
-    textarea {
-      width:100%;
-      min-height:72px;
-      max-height:180px;
-      resize:none;
-      border:none;
-      border-radius: 18px;
-      padding: 18px 18px;
-      font-size: 18px;
-      color:#fff;
-      background: rgba(10,12,24,0.54);
-      outline:none;
+    .message-card{
+      width:min(100%, 680px); border-radius:22px; padding:16px 18px; text-align:left;
+      background:linear-gradient(180deg, rgba(8,12,24,0.68), rgba(8,12,24,0.78));
     }
-    .send-btn {
-      min-width: 96px; height: 72px;
-      border:none; border-radius: 22px;
-      background: #7d8cff; color:#fff;
-      font-size: 18px; font-weight:700; cursor:pointer;
+    .message-head{
+      display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:10px;
     }
-    .bottom-row { display:flex; gap:12px; flex-wrap:wrap; margin-top:12px; }
-    .small-btn {
-      border:none; border-radius:16px; padding: 12px 16px;
-      background: rgba(14,18,32,0.76); color:#fff; cursor:pointer;
-      font-size: 16px;
+    .message-name{ font-size:14px; font-weight:700; }
+    .message-state{ font-size:12px; color:var(--muted); }
+    .message-text{
+      font-size:18px; line-height:1.7; letter-spacing:0.01em;
+      text-shadow:0 1px 0 rgba(0,0,0,0.18); white-space:pre-wrap; word-break:break-word;
     }
-    .menu {
-      position: fixed;
-      right: 18px;
-      top: 86px;
-      z-index: 20;
-      display:none;
-      width: 220px;
-      border-radius: 18px;
-      overflow:hidden;
-      background: rgba(18,22,36,0.88);
-      border: 1px solid rgba(255,255,255,0.08);
-      backdrop-filter: blur(10px);
+    .bottom-ui{
+      display:flex; justify-content:center; align-items:flex-end; gap:12px; pointer-events:none;
+      z-index:3;
     }
-    .menu button {
+    .composer{
+      pointer-events:auto; width:min(94vw, 560px); border-radius:22px; padding:12px;
+      background:linear-gradient(180deg, rgba(10,14,28,0.80), rgba(10,14,28,0.88));
+    }
+    .composer-tools{
+      display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:10px;
+    }
+    .icon-btn{
+      width:46px; height:46px; border-radius:50%;
+      border:1px solid rgba(255,255,255,0.10); background:rgba(255,255,255,0.06);
+      color:#fff; cursor:pointer; font-size:20px; transition:.16s ease;
+      display:inline-flex; align-items:center; justify-content:center;
+    }
+    .icon-btn:hover{ transform:translateY(-1px); background:rgba(255,255,255,0.10); }
+    .icon-btn.active{
+      background:rgba(123,136,255,0.28);
+      box-shadow:0 0 0 2px rgba(123,136,255,0.40) inset;
+    }
+    .icon-btn.recording{
+      background:rgba(255,91,110,0.22);
+      box-shadow:0 0 0 2px rgba(255,91,110,0.42) inset;
+    }
+    .speaker-wrap{
+      display:flex; align-items:center; gap:8px; padding:0 10px; height:42px; border-radius:14px;
+      background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.08);
+      cursor:pointer; user-select:none;
+    }
+    .speaker-dot{
+      width:10px; height:10px; border-radius:50%; background:rgba(255,255,255,0.25);
+      box-shadow:0 0 0 0 rgba(95,227,143,0.0); transition:background .15s ease, box-shadow .15s ease;
+    }
+    .speaker-wrap.active .speaker-dot{
+      background:var(--ok); box-shadow:0 0 0 7px rgba(95,227,143,0.10);
+    }
+    .speaker-label{ font-size:12px; color:var(--muted); }
+    .speaker-wrap.active .speaker-label{ color:#eafff0; }
+    .composer-row{ display:flex; gap:10px; align-items:flex-end; }
+    textarea{
+      width:100%; min-height:60px; max-height:180px; resize:none; border:none; outline:none;
+      border-radius:16px; padding:14px 14px; font-size:16px; line-height:1.5;
+      color:#fff; background:rgba(8,12,24,0.58);
+    }
+    .send-btn{
+      min-width:86px; height:60px; border:none; border-radius:18px;
+      background:var(--accent); color:#fff; font-size:16px; font-weight:700; cursor:pointer;
+    }
+    .menu{
+      position:fixed; left:50%; bottom:118px; transform:translateX(-50%); z-index:40;
+      border-radius:18px; overflow:hidden; display:none; pointer-events:auto;
+      width:min(88vw, 300px);
+    }
+    .menu button{
       width:100%; text-align:left; border:none; background:transparent; color:#fff;
-      padding: 16px 18px; font-size: 16px; cursor:pointer;
-      border-bottom: 1px solid rgba(255,255,255,0.06);
+      padding:14px 16px; font-size:15px; cursor:pointer; border-bottom:1px solid rgba(255,255,255,0.06);
     }
-    .menu button:last-child { border-bottom:none; }
-    .modal-backdrop {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.45);
-      display:none; align-items:center; justify-content:center; z-index: 40;
-      padding: 16px;
+    .menu button:last-child{ border-bottom:none; }
+    .modal-backdrop{
+      position:fixed; inset:0; background:rgba(0,0,0,0.45); display:none;
+      align-items:center; justify-content:center; z-index:60; padding:14px; pointer-events:auto;
     }
-    .modal {
-      width:min(900px, 100%);
-      max-height: 86vh;
-      overflow:auto;
-      border-radius: 22px;
-      background: rgba(18,22,36,0.95);
-      border:1px solid rgba(255,255,255,0.08);
-      padding: 18px;
-      backdrop-filter: blur(12px);
+    .modal{
+      width:min(980px, 100%); max-height:86vh; overflow:auto; border-radius:22px; padding:18px;
     }
-    .modal h2 { margin: 0 0 12px; }
-    .modal textarea { min-height: 160px; margin-bottom: 10px; }
-    .modal-close {
+    .modal h2{ margin:0 0 12px; }
+    .modal h3{ margin:18px 0 10px; }
+    .modal label{ display:block; margin:10px 0 6px; font-size:14px; opacity:0.86; }
+    .modal textarea{ min-height:140px; margin-bottom:10px; }
+    .modal-close{
       float:right; border:none; background:transparent; color:#fff; font-size:22px; cursor:pointer;
     }
-    .history-item { margin: 12px 0; padding: 12px; border-radius: 14px; background: rgba(255,255,255,0.06); }
-    .history-role { font-weight:700; margin-bottom: 6px; }
-    .muted { opacity:0.72; }
-    .hidden-input { display:none; }
-
-    @media (max-width: 640px) {
-      .overlay { padding: 12px; }
-      .container { min-height: calc(100vh - 24px); }
-      h1 { font-size: 22px; }
-      .icon-btn { width: 52px; height: 52px; }
-      .status-item, .msg, textarea, .small-btn { font-size: 15px; }
-      .send-btn { min-width: 86px; font-size: 17px; }
-      .status-box { gap: 10px; }
+    .history-item{
+      margin:10px 0; padding:10px; border-radius:14px; background:rgba(255,255,255,0.06);
+    }
+    .history-role{ font-weight:700; margin-bottom:6px; }
+    .bottom-row{ display:flex; gap:12px; flex-wrap:wrap; margin-top:12px; }
+    .small-btn{
+      border:none; border-radius:16px; padding:12px 16px;
+      background:rgba(14,18,32,0.76); color:#fff; cursor:pointer; font-size:16px;
+    }
+    .hidden-input{ display:none; }
+    .chapter-card, .work-card{
+      margin:10px 0; padding:14px; border-radius:14px; background:rgba(255,255,255,0.06);
+    }
+    .muted{ color:var(--muted); font-size:13px; }
+    @media (max-width: 760px){
+      .overlay{ padding:12px; }
+      .portrait-wrap{ padding:4px 12px 82px; }
+      .portrait{
+        max-width:min(100vw, 520px);
+        max-height:min(88vh, 780px);
+        transform: translateY(34px);
+      }
+      .message-wrap{ bottom:122px; width:calc(100vw - 24px); }
+      .message-text{ font-size:16px; line-height:1.65; }
+      .status-card{ min-width:unset; max-width:52vw; }
+      .composer{ width:100%; }
     }
   </style>
 </head>
 <body>
   <div class="overlay">
-    <div class="container">
-      <div class="topbar">
-        <h1>織姫</h1>
-        <div class="icon-row">
-          <button class="icon-btn" id="camera-btn" title="カメラ">📷</button>
-          <button class="icon-btn" id="menu-btn" title="メニュー">＋</button>
-        </div>
-      </div>
-
+    <div class="topbar">
       <div class="status-card">
-        <div id="status-box" class="status-box"></div>
-      </div>
-
-      <div class="chat-card">
-        <div id="chat-box" class="chat-box"></div>
-      </div>
-
-      <div class="input-card">
-        <div class="input-row">
-          <textarea id="user-input" placeholder="織姫に話しかける..."></textarea>
-          <button id="send-btn" class="send-btn">送信</button>
+        <div class="status-line">
+          <span class="status-label">状態</span>
+          <span class="status-value" id="presence-text">待機中</span>
         </div>
+        <div class="status-line" style="margin-top:6px;">
+          <span class="status-label">執筆中</span>
+          <span class="status-value" id="work-title">未設定</span>
+        </div>
+      </div>
+    </div>
 
-        <div class="bottom-row">
-          <button id="reload-history-btn" class="small-btn">履歴更新</button>
-          <button id="dream-btn" class="small-btn">夢保存</button>
-          <button id="save-memory-btn" class="small-btn">記憶保存</button>
+    <div class="main">
+      <div class="portrait-wrap">
+        <img src="/static/orihime_bg.png" alt="織姫" class="portrait" id="orihime-image">
+      </div>
+      <div class="message-wrap">
+        <div class="message-card">
+          <div class="message-head">
+            <div class="message-name">織姫</div>
+            <div class="message-state" id="message-state">最新の返答だけ表示</div>
+          </div>
+          <div class="message-text" id="message-text">……ここにいるよ。今日はどんな話にする？</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bottom-ui">
+      <div class="composer">
+        <div class="composer-tools">
+          <button class="icon-btn" id="plus-btn" title="メニュー">＋</button>
+          <button class="icon-btn" id="history-icon-btn" title="会話履歴">🕘</button>
+          <button class="icon-btn" id="camera-btn" title="カメラ">📷</button>
+          <button class="icon-btn" id="mic-btn" title="マイク">🎙️</button>
+          <div class="speaker-wrap" id="speaker-wrap">
+            <span class="speaker-dot"></span>
+            <span class="speaker-label" id="speaker-label">スピーカーOFF</span>
+          </div>
+          <button class="icon-btn" id="file-btn" title="ファイル">🖼️</button>
+        </div>
+        <div class="composer-row">
+          <textarea id="user-input" placeholder="話しかける時だけここを使う。普段は織姫の返答だけ前に出す。"></textarea>
+          <button class="send-btn" id="send-btn">送信</button>
         </div>
       </div>
     </div>
   </div>
 
   <div class="menu" id="menu">
-    <button id="file-btn">ファイル選択</button>
-    <button id="dict-btn">辞書</button>
+    <button id="plot-btn">固定プロット</button>
+    <button id="current-work-btn">執筆中の作品</button>
+    <button id="write-btn">続きの執筆</button>
+    <button id="complete-btn">完結（図書館へ）</button>
+    <button id="library-btn">図書館</button>
     <button id="feeling-btn">気持ち</button>
     <button id="hidden-btn">本音</button>
-    <button id="history-open-btn">会話履歴</button>
+    <button id="relation-btn">関係</button>
+    <button id="discussion-btn">プロット相談</button>
   </div>
 
-  <input type="file" id="file-input" class="hidden-input" accept=".txt,.docx,.png,.jpg,.jpeg,.webp">
-  <input type="file" id="camera-input" class="hidden-input" accept="image/*" capture="environment">
-
-  <div id="modal-backdrop" class="modal-backdrop">
-    <div class="modal" id="modal">
-      <button class="modal-close" id="modal-close">✕</button>
+  <div class="modal-backdrop" id="modal-backdrop">
+    <div class="modal">
+      <button class="modal-close" id="modal-close">×</button>
       <div id="modal-content"></div>
     </div>
   </div>
+
+  <input class="hidden-input" id="file-input" type="file" accept=".txt,.docx">
+  <input class="hidden-input" id="camera-input" type="file" accept="image/*" capture="environment">
+  <input class="hidden-input" id="image-input" type="file" accept="image/*">
+  <audio id="tts-audio" preload="auto"></audio>
 
   <script src="/static/app.js"></script>
 </body>

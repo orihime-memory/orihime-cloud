@@ -6,3 +6,5 @@ requests
 python-dotenv
 Flask
 gunicorn
+python-docx
+supabase
