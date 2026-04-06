@@ -25,7 +25,35 @@
     body{
       background:
         radial-gradient(circle at 50% 10%, rgba(122,142,255,0.16), transparent 28%),
-        linear-gradient(180deg, var(--bg1) 0%, var(--bg2) 45%, var(--bg3) 100%);
+        linear-gradient(180deg, rgba(9,16,29,0.72) 0%, rgba(16,24,42,0.72) 45%, rgba(23,29,44,0.78) 100%),
+        url("/static/orihime_bg.png") center/cover no-repeat;
+    }
+    .camera-controls{
+      position: absolute;
+      right: 20px;
+      bottom: 70px;
+      width: 200px;
+      display: none;
+      gap: 8px;
+      justify-content: center;
+      z-index: 31;
+    }
+
+    .camera-mini-btn{
+      width: 46px;
+      height: 32px;
+      border: none;
+      border-radius: 12px;
+      background: rgba(10,14,28,0.82);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.10);
+      cursor: pointer;
+      font-size: 16px;
+    }
+
+    .shutter-btn{
+      width: 58px;
+      font-size: 18px;
     }
     .overlay{
       position:fixed; inset:0; display:grid;
@@ -50,18 +78,25 @@
       position:relative; display:flex; align-items:center; justify-content:center; min-height:0;
     }
     .portrait-wrap{
-      position:absolute; inset:0; display:flex; align-items:flex-end; justify-content:center;
-      pointer-events:none; padding:8px 18px 88px;
-    }
-    .portrait{
-      width:auto; height:auto;
-      max-width:min(88vw, 760px);
-      max-height:min(82vh, 1120px);
+      position:absolute;
+      left:0;
+      right:0;
+      bottom:0;
+      top:0;
+      display:flex;
+      align-items:flex-end;
+      justify-content:center;
+      pointer-events:none;
+     padding:18px 18px 0;
+    }    .portrait{
+
+      width:auto;
+      height:min(86vh, 980px);
+      max-width:min(92vw, 760px);
       object-fit:contain;
-      object-position:center top;
+      object-position:center bottom;
       filter: drop-shadow(0 18px 48px rgba(0,0,0,0.35));
       user-select:none; -webkit-user-drag:none;
-      transform: translateY(42px);
     }
     .message-wrap{
       position:absolute; left:50%; bottom:116px; transform:translateX(-50%);
@@ -169,22 +204,215 @@
       margin:10px 0; padding:14px; border-radius:14px; background:rgba(255,255,255,0.06);
     }
     .muted{ color:var(--muted); font-size:13px; }
-    @media (max-width: 760px){
-      .overlay{ padding:12px; }
-      .portrait-wrap{ padding:4px 12px 82px; }
-      .portrait{
-        max-width:min(100vw, 520px);
-        max-height:min(88vh, 780px);
-        transform: translateY(34px);
-      }
-      .message-wrap{ bottom:122px; width:calc(100vw - 24px); }
-      .message-text{ font-size:16px; line-height:1.65; }
-      .status-card{ min-width:unset; max-width:52vw; }
-      .composer{ width:100%; }
-    }
+@media (max-width: 760px){
+  .overlay{
+    padding: 8px;
+    grid-template-rows: auto 1fr auto;
+  }
+
+  .status-card{
+    max-width: 48vw;
+    padding: 8px 10px;
+    border-radius: 14px;
+  }
+
+  .camera-controls{
+    top: 230px;
+    left: 8px;
+    right: auto;
+    bottom: auto;
+    width: 110px;
+    gap: 6px;
+  }
+
+  .camera-mini-btn{
+    width: 36px;
+    height: 28px;
+    border-radius: 10px;
+    font-size: 14px;
+  }
+
+  .shutter-btn{
+    width: 46px;
+    font-size: 16px;
+  }
+
+  .portrait-wrap{
+    padding: 0;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .portrait{
+    height: 62vh;
+    max-width: 86vw;
+  }
+
+  .message-wrap{
+    left: 50%;
+    bottom: 118px;
+    transform: translateX(-50%);
+    width: calc(100vw - 16px);
+    z-index: 12;
+  }
+
+  .message-card{
+    border-radius: 18px;
+    padding: 12px 14px;
+  }
+
+  .message-text{
+    font-size: 15px;
+    line-height: 1.55;
+  }
+
+  .bottom-ui{
+    position: fixed;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    z-index: 30;
+    pointer-events: none;
+  }
+
+  .composer{
+    width: 100%;
+    padding: 8px;
+    border-radius: 18px;
+    pointer-events: auto;
+  }
+
+  .composer-tools{
+    position: fixed;
+    right: 8px;
+    top: 110px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 0;
+    z-index: 35;
+  }
+
+  .composer-row{
+    gap: 8px;
+    align-items: center;
+  }
+
+  textarea#user-input{
+    min-height: 46px;
+    max-height: 46px;
+    height: 46px;
+    padding: 11px 12px;
+    font-size: 15px;
+    line-height: 1.2;
+    overflow: hidden;
+  }
+
+  .send-btn{
+    min-width: 74px;
+    height: 46px;
+    border-radius: 14px;
+  }
+
+  #camera-preview{
+    top: 76px !important;
+    left: 8px !important;
+    right: auto !important;
+    bottom: auto !important;
+    width: 110px !important;
+    height: 146px;
+    object-fit: cover;
+    border-radius: 14px;
+    z-index: 34;
+  }
+
+.camera-controls{
+  position: absolute;
+  right: 20px;
+  bottom: 70px;
+  width: 200px;
+  display: none;
+  gap: 8px;
+  justify-content: center;
+  z-index: 31;
+}
+
+.camera-mini-btn{
+  width: 46px;
+  height: 32px;
+  border: none;
+  border-radius: 12px;
+  background: rgba(10,14,28,0.82);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.10);
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.shutter-btn{
+  width: 58px;
+  font-size: 18px;
+}
+
+  .menu{
+    left: auto;
+    right: 8px;
+    bottom: 64px;
+    transform: none;
+    width: 220px;
+  }
+
+  .speaker-wrap{
+    width: 46px;
+    height: 46px;
+    padding: 0;
+    justify-content: center;
+    border-radius: 50%;
+  }
+
+  .speaker-label{
+    display: none;
+  }
+}
+.portrait-3d{
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  z-index:1;
+}
+
+.portrait-3d canvas{
+  width:100% !important;
+  height:100% !important;
+  display:block;
+}
   </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+      "@pixiv/three-vrm": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@2.1.2/lib/three-vrm.module.js"
+    }
+  }
+  </script>
 </head>
 <body>
+  <video id="camera-preview" autoplay playsinline style="
+      position: absolute;
+      bottom: 120px;
+      right: 20px;
+      width: 200px;
+      border-radius: 10px;
+      display: none;
+      z-index: 30;
+      background: #000;
+  "></video>
+
+<div id="camera-controls" class="camera-controls">
+  <button class="camera-mini-btn" id="camera-switch-btn" title="前後切替">↺</button>
+  <button class="camera-mini-btn shutter-btn" id="camera-shutter-btn" title="撮影">●</button>
+</div>
   <div class="overlay">
     <div class="topbar">
       <div class="status-card">
@@ -200,9 +428,9 @@
     </div>
 
     <div class="main">
-      <div class="portrait-wrap">
-        <img src="/static/orihime_bg.png" alt="織姫" class="portrait" id="orihime-image">
-      </div>
+    <div class="portrait-wrap">
+      <div id="vrm-layer" class="portrait-3d"></div>
+    </div>
       <div class="message-wrap">
         <div class="message-card">
           <div class="message-head">
@@ -218,6 +446,7 @@
       <div class="composer">
         <div class="composer-tools">
           <button class="icon-btn" id="plus-btn" title="メニュー">＋</button>
+          <button onclick="runDream()">夢</button>
           <button class="icon-btn" id="history-icon-btn" title="会話履歴">🕘</button>
           <button class="icon-btn" id="camera-btn" title="カメラ">📷</button>
           <button class="icon-btn" id="mic-btn" title="マイク">🎙️</button>
@@ -236,10 +465,9 @@
   </div>
 
   <div class="menu" id="menu">
+    <button id="menu-file-btn">ファイル選択</button>
     <button id="plot-btn">固定プロット</button>
-    <button id="current-work-btn">執筆中の作品</button>
-    <button id="write-btn">続きの執筆</button>
-    <button id="complete-btn">完結（図書館へ）</button>
+    <button id="current-work-btn">執筆中</button>
     <button id="library-btn">図書館</button>
     <button id="feeling-btn">気持ち</button>
     <button id="hidden-btn">本音</button>
@@ -259,6 +487,7 @@
   <input class="hidden-input" id="image-input" type="file" accept="image/*">
   <audio id="tts-audio" preload="auto"></audio>
 
-  <script src="/static/app.js"></script>
+<script type="module" src="/static/js/vrm.js"></script>
+<script src="/static/app.js"></script>
 </body>
 </html>

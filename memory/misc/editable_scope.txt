@@ -1,0 +1,15 @@
+【ましぅが編集する領域】
+- profile.txt
+- core_memory.txt
+- long_memory.txt
+- memory_tags.txt
+- story_plot.json
+- plot_discussion.txt
+
+【織姫が自動更新する領域】
+- self_state.txt
+- self_memory.txt
+- hidden_thoughts.txt
+- relation_memory.txt
+- document_digests.txt
+- chapters/
